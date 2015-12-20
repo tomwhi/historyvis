@@ -46,7 +46,10 @@ Outputs:
     monarch_list_filenames = readMonarchListFilenames(open(args[0]))
 
     # Extract person links from the specified wikipedia pages:
+    outfile = open(options.out, 'w')
     output_links = scraper.extractPersonLinksFromPages(monarch_list_filenames)
+    for link in output_links:
+        print >> outfile, link
 
 
 if __name__ == '__main__':
