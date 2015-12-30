@@ -25,11 +25,12 @@ def extractPersonLinksFromPages(monarch_list_links, sleep_time = 1):
             curr_page_contents = urllib2.urlopen(monarch_list_link).read()
             curr_page_dom = xml.dom.minidom.parseString(curr_page_contents)
             curr_links = scrapeMonarchListPage(curr_page_dom)
-            pdb.set_trace()
             output_links = output_links.union(curr_links)
+            print >> sys.stderr, len(output_links)
         except Exception, e:
             # This page failed for some reason, report the error but then continue:
             print >> sys.stderr, "Extracting links failed for page:", monarch_list_link
+            print >> sys.stderr, e
         time.sleep(1)
 
     return output_links
@@ -89,7 +90,11 @@ def scrapeMonarchListPage(dom):
     # For each of those tables...
     for table in dom_tables:
         # Scrape links from this table if it contains them:
-        curr_links = scrapeMonarchsFromTable(table)
+        try:
+            curr_links = scrapeMonarchsFromTable(table)
+        except Exception, e:
+            print >> sys.stderr, "Failed to scrape table, skipping."
+
         monarch_links = monarch_links.union(curr_links)
 
     return monarch_links
