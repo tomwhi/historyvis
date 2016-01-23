@@ -6,8 +6,184 @@ Created on Dec 20, 2015
 @author: thowhi
 '''
 
-import pdb, sys, time, urllib2
+import pdb, sys, time, urllib2, re
 import xml.dom.minidom
+
+def filterDeadLink(link):
+    if link.split("&")[-1] == "redlink=1":
+        return None
+    else:
+        return link
+
+def writeVal(link, outfile):
+    if link != None:
+        outfile.write(link.encode("utf-8"))
+    else:
+        outfile.write('null')
+
+class Person:
+    def __init__(self, link):
+        time.sleep(0.1)
+        page = urllib2.urlopen("https://en.wikipedia.org" + link)
+        contents = page.read()
+        self.dom = xml.dom.minidom.parseString(contents)
+
+        try:
+            self.link = self.extractLink()
+        except Exception, e:
+            self.link = None
+        try:
+            self.setName()
+        except Exception, e:
+            self.name = None
+        try:
+            self.setMother()
+        except Exception, e:
+            self.mother = None
+        try:
+            self.setFather()
+        except Exception, e:
+            self.father = None
+        try:
+            self.setChildren()
+        except Exception, e:
+            self.children = []
+        try:
+            self.setBirth()
+        except Exception, e:
+            self.birth = None
+        try:
+            self.setDeath()
+        except Exception, e:
+            self.death = None
+
+    def extractLink(self):
+        link = [linkNode for linkNode in self.dom.childNodes[1].getElementsByTagName("link") if linkNode.attributes["rel"].nodeValue == "canonical"][0]
+        canonicalLinkURL = link.attributes["href"].nodeValue
+        canonicalLink = "/" + "/".join(canonicalLinkURL.split("/")[-2:])
+        return canonicalLink
+
+    def writeJSON(self, outfile):
+        outfile.write('{"name": "')
+        writeVal(self.name, outfile)
+        outfile.write('", "mother": "')
+        writeVal(self.mother, outfile)
+        outfile.write('", "father": "')
+        writeVal(self.father, outfile)
+        outfile.write('", "children": [')
+        if len(self.children) > 0:
+            for child in self.children[:-1]:
+                outfile.write('"')
+                writeVal(child, outfile)
+                outfile.write('", ')
+            outfile.write('"')
+            writeVal(self.children[-1], outfile)
+            outfile.write('"')
+        outfile.write('], "birth": ')
+        writeVal(self.birth, outfile)
+        outfile.write(', "death": ')
+        writeVal(self.death, outfile)
+        outfile.write('}')
+
+    def setName(self):
+        matchingNodes = [node for node in self.dom.getElementsByTagName("h1")]
+        self.name = matchingNodes[0].childNodes[0].nodeValue.replace('"', '\\"')
+
+    # Extract the link and name for the specified parent of this person, by
+    # looking at the information in the wikipedia page for the person.
+    # Generate a new person from the resulting link and name if the link
+    # is null or no person already exists for this link. Otherwise just
+    # retrieve the existing person:
+    def setMother(self):
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Mother"]
+        parentNode = matchingNodes[0].nextSibling.nextSibling.childNodes[0]
+        if parentNode.nodeName == "#text":
+            # There is no parent link; ignore:
+            self.mother = None
+        else:
+            self.mother = filterDeadLink(parentNode.attributes['href'].nodeValue)
+
+    def setFather(self):
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Father"]
+        parentNode = matchingNodes[0].nextSibling.nextSibling.childNodes[0]
+        if parentNode.nodeName == "#text":
+            # There is no parent link; ignore:
+            self.father = None
+        else:
+            self.father = filterDeadLink(parentNode.attributes['href'].nodeValue)
+
+    def setChildren(self):
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Issue"]
+        childNodes = matchingNodes[0].nextSibling.nextSibling.getElementsByTagName("a")
+        self.children = filter(lambda link: link != None, map(lambda node: filterDeadLink(node.attributes['href'].nodeValue), childNodes))
+
+    def setBirth(self):
+        # Extract birth year information from wikipedia if available, and store it:
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Born"]
+        textNodes = filter(lambda node: node.nodeType == 3, matchingNodes[0].nextSibling.nextSibling.childNodes)
+        birthInfo = textNodes[0].nodeValue
+        span = re.search("[0-9]{3,}", birthInfo).span()
+        birthYear = birthInfo[span[0]:span[1]]
+        self.birth = birthYear
+
+    def setDeath(self):
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Died"]
+        textNodes = filter(lambda node: node.nodeType == 3, matchingNodes[0].nextSibling.nextSibling.childNodes)
+        deathInfo = textNodes[0].nodeValue
+        span = re.search("[0-9]{3,}", deathInfo).span()
+        deathYear = deathInfo[span[0]:span[1]]
+        self.death = deathYear
+
+    def addChild(self, child):
+        self.children.append(child)
+
+
+def scrapeIndividualData(individualLinks, outfile):
+    # Create empty set of people (whose wikipedia page I have inspected):
+    linksInspected = set()
+
+    # Create stack of links forwhose wikipedia pages I potentially still need to
+    # inspect - starting with the specified links:
+    linksToInspect = individualLinks
+
+    link2canonical = {}
+
+    # While the stack is not empty...
+    while len(linksToInspect) > 0:
+        # Get the next individual to inspect:
+        currLink = linksToInspect.pop()
+
+        if not currLink in linksInspected:
+            print >> sys.stderr, "Inspecting link:", currLink
+            try:
+                currPerson = Person(currLink)
+                resolvedLink = currPerson.link
+                link2canonical[currLink] = resolvedLink
+                # FIX:
+                print >> sys.stderr, "#", currLink, resolvedLink
+
+                # "Inspect" them, if they're not already in the links inspected:
+                if not resolvedLink in linksInspected:
+                    linksInspected.add(resolvedLink)
+
+                    # XXX FIX HERE: Unicode decoding encoding is not working. Don't really understand this.
+                    #.decode('utf-8').encode("utf-8")
+                    outfile.write('"')
+                    outfile.write(currLink)
+                    outfile.write('" : ')
+                    currPerson.writeJSON(outfile)
+                    print >> outfile, ","
+                    outfile.flush()
+
+                    for personLink in [currPerson.mother, currPerson.father] + currPerson.children:
+                        if not personLink in linksInspected and personLink != None:
+                            linksToInspect.append(personLink)
+            except Exception, e:
+                print >> sys.stderr, "Could not extract person info:", currLink
+                pdb.set_trace()
+                x = 1
+
+    return link2canonical
 
 
 def extractPersonLinksFromPages(monarch_list_links, sleep_time = 1):

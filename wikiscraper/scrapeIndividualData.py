@@ -1,54 +1,6 @@
-#mport sys, time, urllib2
-import xml.dom.minidom
-
-name2person = {}
-
-class Person:
-    def __init__(self, name, link):
-        self.name = name
-        self.link = link
-        self.mother = None
-        self.father = None
-    def setMother(self, mother):
-        self.mother = mother
-    def setFather(self, father):
-        self.father = father
-    def toString(self):
-        return(self.name)
-
-def getParent(currPerson, parentType):
-    contents = urllib2.urlopen("https://en.wikipedia.org" + currPerson.link).read()
-    dom = xml.dom.minidom.parseString(contents)
-    matchingNodes = [node for node in dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == parentType]
-    parentNode = matchingNodes[0].nextSibling.nextSibling.childNodes[0]
-    if parentNode.nodeName == "#text":
-        parentName = parentNode.nodeValue
-        parentLink = None
-    else:
-        assert parentNode.nodeName == "a"
-        parentLink = parentNode.attributes['href'].nodeValue
-        parentName = parentNode.attributes['title'].nodeValue
-    parentPerson = Person(parentName, parentLink)
-    return parentPerson
-
-def getAncestry(currPerson, name2person):
-    print >> sys.stderr, "Getting ancestry for: " + currPerson.name
-    mother = getParent(currPerson, "Mother")
-    father = getParent(currPerson, "Father")
-    if mother.link != None and not name2person.has_key(mother.name):
-        try:
-            getAncestry(mother, name2person)
-        except Exception, e:
-            pass
-    if father.link != None and not name2person.has_key(father.name):
-        try:
-            getAncestry(father, name2person)
-        except Exception, e:
-            pass
-    currPerson.mother = mother
-    currPerson.father = father
-    name2person[mother.name] = mother
-    name2person[father.name] = father
+from optparse import OptionParser
+import pdb, sys
+import scraper
 
 
 def main():
@@ -72,7 +24,7 @@ Outputs:
 
     parser = OptionParser(usage = description)
     parser.add_option("--out", dest = "out",
-                      default = "OutputLinks.txt",
+                      default = "Individuals.json",
                       help = "Name of output file; will be overwritten. " + \
                           "Default=[%default]")
     parser.add_option("--debug", action="store_true", dest="debug",
@@ -90,40 +42,21 @@ Outputs:
         parser.print_help()
         sys.exit(1)
 
-    monarch_list_filenames = readMonarchListFilenames(open(args[0]))
+    individuals_list = [line.strip() for line in open(args[0]).readlines()]
 
-    # Extract person links from the specified wikipedia pages:
+    # Scrape data from the specified wikipedia pages:
     outfile = open(options.out, 'w')
-    output_links = scraper.extractPersonLinksFromPages(monarch_list_filenames)
-    for link in output_links:
-        print >> outfile, link
+    print >> outfile, "{"
+    try:
+        link2canonical = scraper.scrapeIndividualData(individuals_list, outfile)
+    except Exception, e:
+        pass
+    print >> outfile, "}"
+    outfile.close()
+
+#    for link in link2canonical:
+#        print link, link2canonical[link]
 
 
 if __name__ == '__main__':
     sys.exit(main())
-
-
-
-#johnno = Person('John III of Sweden', '/wiki/John_III_of_Sweden')
-#getAncestry(johnno, people)
-
-mazza = Person('Marie of France, Countess of Champagne', '/wiki/Marie_of_France,_Countess_of_Champagne')
-getAncestry(mazza, name2person)
-name2person[mazza.name] = mazza
-
-# This will not work, I have made a horrible mess. :-(
-
-nodesFile = open("PersonNodes.csv", 'w')
-edgesFile = open("PersonEdges.csv", 'w')
-print >> nodesFile, "ID,Label"
-print >> edgesFile, "Source,Target"
-for name in name2person:
-	person = name2person[name]
-	print >> nodesFile, person.toString().replace(" ", "_").replace(",","-").encode("utf8") + "," + person.toString().replace(" ", "_").replace(",","-").encode("utf8")
-	if person.mother != None:
-		print >> edgesFile, person.toString().replace(" ", "_").replace(",","-").encode("utf8") + "," + person.mother.toString().replace(" ", "_").replace(",","-").encode("utf8")
-	if person.father != None:
-		print >> edgesFile, person.toString().replace(" ", "_").replace(",","-").encode("utf8") + "," +  person.father.toString().replace(" ", "_").replace(",","-").encode("utf8")
-
-nodesFile.close()
-edgesFile.close()
