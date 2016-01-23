@@ -1,13 +1,16 @@
 from optparse import OptionParser
-import pdb, sys
+import json, pdb, sys, urllib
 import scraper
+import codecs
 
 
 def main():
     # Parse the command-line arguments...
-    description = """usage: %prog [options] <monarchWikiPageFile>\n
+    description = """usage: %prog [options] <individuals> <lineage2canonical>\n
 Inputs:
-- File containing wikipedia links to monarch list pages, one per line
+- File containing wikipedia links to individuals, one per line
+- JSON file containing mappings from lineage wiki link to canonical lineage
+wiki link
 
 Outputs:
 - A JSON file containing individuals as Objects, organised as follows:
@@ -37,21 +40,44 @@ Outputs:
         pdb.set_trace()
 
     # Make sure the required input arguments exist:
-    if (len(args) != 1):
+    if (len(args) != 2):
         print >> sys.stderr, "WRONG # ARGS: ", len(args)
         parser.print_help()
         sys.exit(1)
 
     individuals_list = [line.strip() for line in open(args[0]).readlines()]
 
+    lineage2canonical = json.load(open(args[1]))
+
     # Scrape data from the specified wikipedia pages:
-    outfile = open(options.out, 'w')
-    print >> outfile, "{"
-    try:
-        link2canonical = scraper.scrapeIndividualData(individuals_list, outfile)
-    except Exception, e:
-        pass
-    print >> outfile, "}"
+    outfile = codecs.open(options.out, 'w', "utf-8")
+    print >> outfile, u"{"
+    print >> sys.stderr, "Scraping data..."
+    individuals = scraper.scrapeIndividualData(individuals_list, lineage2canonical)
+    individualStrs = []
+    for individual in individuals:
+        try:
+            currStr = '"' + individual.link + "\" : "
+            currStr += individual.toJSON() + ""
+        except Exception, e:
+            pdb.set_trace()
+        individualStrs.append(currStr)
+    outString = ",\n".join(individualStrs)
+    # Note: I had some trouble figuring out UTF-8 encoding / decoding. This seems
+    # to work now:
+    print >> outfile, outString.decode("utf-8")
+#    for individual in individuals:
+#        # XXX FIX HERE: Unicode decoding encoding is not working. Don't really understand this.
+#        #.decode('utf-8').encode("utf-8")
+#        outfile.write('"')
+#        outfile.write(individual.link)
+#        outfile.write('" : ')
+#        individual.writeJSON(outfile)
+#        print >> outfile, ","
+#        outfile.flush()
+
+    print >> sys.stderr, "Scraped data..."
+    print >> outfile, u"}"
     outfile.close()
 
 #    for link in link2canonical:

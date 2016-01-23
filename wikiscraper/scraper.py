@@ -6,7 +6,7 @@ Created on Dec 20, 2015
 @author: thowhi
 '''
 
-import pdb, sys, time, urllib2, re
+import gc, pdb, sys, time, urllib2, re
 import xml.dom.minidom
 
 def filterDeadLink(link):
@@ -21,9 +21,49 @@ def writeVal(link, outfile):
     else:
         outfile.write('null')
 
+def toJSON(string):
+    if string == None:
+        return "null"
+    else:
+        try:
+            return u"\"" + string.decode("utf-8") + u"\""
+        except Exception, e:
+            pdb.set_trace()
+            x = 1
+
+class Reign:
+    def __init__(self, reignDomElement, lineage2canonical):
+        """Traverse the dom starting from the specified element, to extract
+        the reign information. lineage2canonical links from link to canonical
+        link for all lineages of interest."""
+
+        # Extract the reign duration from the ensuing node:
+        # Note: Seems nasty and hacky, but I think this should work almost always:
+        reignDurationXML = reignDomElement.nextSibling.nextSibling.toxml()
+        pattern = re.compile("[0-9]{3,}")
+        matchYears = re.findall("[0-9]{3,}", reignDurationXML)
+        if not len(matchYears) == 2:
+            raise ValueError("Invalid reign start and end info:"), reignDurationXML
+        self.reignStart = int(matchYears[0])
+        self.reignEnd = int(matchYears[1])
+        print >> sys.stderr, self.reignStart, self.reignEnd
+
+        # Extract the link from the preceding node:
+        lineageLink = reignDomElement.parentNode.previousSibling.previousSibling.getElementsByTagName('a')[0]
+        self.link = lineageLink.attributes["href"].nodeValue
+        print >> sys.stderr, self.link
+
+    def correctLineageLink(self, link2canonical):
+        assert link2canonical.has_key(self.link)
+        self.link = link2canonical[self.link]
+
+    def toJSON(self):
+        return "\"" + self.link + "\" : [" + str(self.reignStart) + " , " + str(self.reignEnd) + "]"
+
+
 class Person:
-    def __init__(self, link):
-        time.sleep(0.1)
+    def __init__(self, link, lineage2canonical):
+        time.sleep(0.5)
         page = urllib2.urlopen("https://en.wikipedia.org" + link)
         contents = page.read()
         self.dom = xml.dom.minidom.parseString(contents)
@@ -48,21 +88,44 @@ class Person:
             self.setChildren()
         except Exception, e:
             self.children = []
-        try:
-            self.setBirth()
-        except Exception, e:
-            self.birth = None
+        # Only accept valid birth dates; propagate any exceptions:
+        self.setBirth()
+        if self.birth == None:
+            raise ValueError("Invalid birth value.")
         try:
             self.setDeath()
         except Exception, e:
             self.death = None
+        try:
+            self.setReigns(lineage2canonical)
+        except Exception, e:
+            self.reigns = {}
+
+        # I don't like this... perhaps refactor later on:
+        self.dom = None
+
+    def correctLinks(self, link2canonical):
+        if link2canonical.has_key(self.mother):
+            self.mother = link2canonical[self.mother]
+        else:
+            self.mother = None
+        if link2canonical.has_key(self.father):
+            self.father = link2canonical[self.father]
+        else:
+            self.father = None
+        children = self.children
+        self.children = []
+        for child in children:
+            if link2canonical.has_key(child):
+                self.children.append(link2canonical[child])
 
     def extractLink(self):
         link = [linkNode for linkNode in self.dom.childNodes[1].getElementsByTagName("link") if linkNode.attributes["rel"].nodeValue == "canonical"][0]
-        canonicalLinkURL = link.attributes["href"].nodeValue
+        canonicalLinkURL = urllib2.unquote(link.attributes["href"].nodeValue.encode("utf-8"))
         canonicalLink = "/" + "/".join(canonicalLinkURL.split("/")[-2:])
         return canonicalLink
 
+    # Had trouble with dealing with unicode, hence this extra method:
     def writeJSON(self, outfile):
         outfile.write('{"name": "')
         writeVal(self.name, outfile)
@@ -85,9 +148,39 @@ class Person:
         writeVal(self.death, outfile)
         outfile.write('}')
 
+    def toJSON(self):
+        try:
+            outStr = u"{\"name\": "
+            outStr += toJSON(self.name)
+            outStr += u", \"mother\": "
+            outStr += toJSON(self.mother)
+            outStr += u", \"father\": "
+            outStr += toJSON(self.father)
+            outStr += u', "children": ['
+            if len(self.children) > 0:
+                for child in self.children[:-1]:
+                    outStr += toJSON(child)
+                    outStr += ', '
+                outStr += toJSON(self.children[-1])
+            outStr += '], "reigns": {'
+            if len(self.reigns.keys()) > 0:
+                outStr += ", ".join(map(lambda reign: self.reigns[reign].toJSON(), self.reigns.keys()))
+            outStr += '}, "birth": '
+            outStr += self.birth
+            outStr += ', "death": '
+            if self.death != None:
+                outStr += self.death
+            else:
+                outStr += "null"
+            outStr += '}'
+        except Exception, e:
+            pdb.set_trace()
+            x = 1
+        return outStr.encode("utf-8")
+
     def setName(self):
         matchingNodes = [node for node in self.dom.getElementsByTagName("h1")]
-        self.name = matchingNodes[0].childNodes[0].nodeValue.replace('"', '\\"')
+        self.name = matchingNodes[0].childNodes[0].nodeValue.replace('"', '\\"').encode("utf-8")
 
     # Extract the link and name for the specified parent of this person, by
     # looking at the information in the wikipedia page for the person.
@@ -134,29 +227,45 @@ class Person:
         deathYear = deathInfo[span[0]:span[1]]
         self.death = deathYear
 
+    def setReigns(self, lineage2canonical):
+        # Obtain all "Reign" fields:
+        matchingNodes = [node for node in self.dom.getElementsByTagName("th") if node.childNodes[0].nodeValue == "Reign"]
+        self.reigns = {}
+        for reignNode in matchingNodes:
+            currReign = Reign(reignNode, lineage2canonical)
+            if lineage2canonical.has_key(currReign.link):
+                # This reign is in the set of lineages of interest. Correct the link to use the canonical
+                # link if necessary, and retain this lineage information:
+                currReign.correctLineageLink(lineage2canonical)
+                self.reigns[currReign.link] = currReign
+
     def addChild(self, child):
         self.children.append(child)
 
 
-def scrapeIndividualData(individualLinks, outfile):
+#@profile
+def scrapeIndividualData(individualLinks, lineage2canonical):
     # Create empty set of people (whose wikipedia page I have inspected):
     linksInspected = set()
 
-    # Create stack of links forwhose wikipedia pages I potentially still need to
+    # Create stack of links whose wikipedia pages I potentially still need to
     # inspect - starting with the specified links:
     linksToInspect = individualLinks
 
     link2canonical = {}
+    individuals = []
 
     # While the stack is not empty...
-    while len(linksToInspect) > 0:
+    while len(linksToInspect) > 0 and len(linksInspected) < 500:
+        print >> sys.stderr, "Inspected:", len(linksInspected)
         # Get the next individual to inspect:
         currLink = linksToInspect.pop()
 
         if not currLink in linksInspected:
             print >> sys.stderr, "Inspecting link:", currLink
             try:
-                currPerson = Person(currLink)
+                currPerson = Person(currLink, lineage2canonical)
+                individuals.append(currPerson)
                 resolvedLink = currPerson.link
                 link2canonical[currLink] = resolvedLink
                 # FIX:
@@ -166,24 +275,20 @@ def scrapeIndividualData(individualLinks, outfile):
                 if not resolvedLink in linksInspected:
                     linksInspected.add(resolvedLink)
 
-                    # XXX FIX HERE: Unicode decoding encoding is not working. Don't really understand this.
-                    #.decode('utf-8').encode("utf-8")
-                    outfile.write('"')
-                    outfile.write(currLink)
-                    outfile.write('" : ')
-                    currPerson.writeJSON(outfile)
-                    print >> outfile, ","
-                    outfile.flush()
-
                     for personLink in [currPerson.mother, currPerson.father] + currPerson.children:
                         if not personLink in linksInspected and personLink != None:
                             linksToInspect.append(personLink)
+
             except Exception, e:
                 print >> sys.stderr, "Could not extract person info:", currLink
-                pdb.set_trace()
-                x = 1
+                #pdb.set_trace()
+                #x = 1
 
-    return link2canonical
+    # Correct all the links, to use only canonical links:
+    for individual in individuals:
+        individual.correctLinks(link2canonical)
+
+    return individuals
 
 
 def extractPersonLinksFromPages(monarch_list_links, sleep_time = 1):
@@ -268,10 +373,9 @@ def scrapeMonarchListPage(dom):
         # Scrape links from this table if it contains them:
         try:
             curr_links = scrapeMonarchsFromTable(table)
+            monarch_links = monarch_links.union(curr_links)
         except Exception, e:
             print >> sys.stderr, "Failed to scrape table, skipping."
-
-        monarch_links = monarch_links.union(curr_links)
 
     return monarch_links
 
