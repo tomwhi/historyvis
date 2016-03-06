@@ -256,7 +256,7 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
     individuals = []
 
     # While the stack is not empty...
-    while len(linksToInspect) > 0:# and len(linksInspected) < 500:
+    while len(linksInspected) < 100:# and len(linksToInspect) > 0:
         print >> sys.stderr, "Inspected:", len(linksInspected)
         # Get the next individual to inspect:
         currLink = linksToInspect.pop()
@@ -265,7 +265,6 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
             print >> sys.stderr, "Inspecting link:", currLink
             try:
                 currPerson = Person(currLink, lineage2canonical)
-                individuals.append(currPerson)
                 resolvedLink = currPerson.link
                 link2canonical[currLink] = resolvedLink
                 # FIX:
@@ -273,6 +272,7 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
 
                 # "Inspect" them, if they're not already in the links inspected:
                 if not resolvedLink in linksInspected:
+                    individuals.append(currPerson)
                     linksInspected.add(resolvedLink)
 
                     for personLink in [currPerson.mother, currPerson.father] + currPerson.children:
