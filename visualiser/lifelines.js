@@ -41,6 +41,117 @@ Person.prototype = {
 }
 
 
+// FIXME/NOTE:
+// I have selectedPeople and link2person appearing all over the place
+// together. This is because the items in selectedPeople apparently
+// need to be strings, due to javascript. Perhaps I should have
+// some object that encapsulates a set of people, keeping this detail
+// internal. Won't implement this yet though.
+
+
+function getFirstBirth(selectedPeople, link2person) {
+	peopleArr = Array.from(selectedPeople);
+	earliestBirthDate = Infinity;
+	var nPeople = peopleArr.length;
+
+	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
+		currPersonObj = link2person[peopleArr[personIdx]];
+		if (currPersonObj.birth < earliestBirthDate) {
+			earliestBirthDate = currPersonObj.birth;
+		}
+	}
+	
+	return earliestBirthDate;
+}
+
+
+function getEndDeath(selectedPeople, link2person) {
+	peopleArr = Array.from(selectedPeople);
+	lastDeathDate = -Infinity;
+	var nPeople = peopleArr.length;
+	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
+		currPersonObj = link2person[peopleArr[personIdx]];
+		if (currPersonObj.death > lastDeathDate) {
+			lastBirthDate = currPersonObj.death;
+		}
+		
+		// If no death is given, then the person is assumed to still
+		// be alive => return the current year:
+		if (currPersonObj.death === null) {
+			var today = new Date();
+			lastDeathDate = today.getFullYear();
+		}
+	}
+	
+	return lastDeathDate;
+}
+
+
+// A plot of a set of lifeline bars:
+function LifelinePlot(selectedPeople, link2person, height) {
+	this.startYear = null; // Year corresponding to the start of the plot
+	this.endYear = null; // Year corresponding to the end of the plot
+	this.canvasHeight = height;
+	this.peopleToPlot = selectedPeople;
+	this.link2person = link2person;
+}
+
+
+LifelinePlot.prototype = {
+	setUpCanvas: function() {
+		// Calibrate the canvas start and end year based on the earliest birth
+		// and last death dates:
+		this.startYear = getFirstBirth(this.peopleToPlot, this.link2person);
+		this.endYear = getEndDeath(this.peopleToPlot, this.link2person);
+		
+		console.log("TRACE: Years for plot:");
+		console.log(this.startYear);
+		console.log(this.endYear);
+		
+		// XXX CONTINUE HERE:
+		// XXX PLAN OUT HOW TO USE THIS LIFELINEPLOT TO GENERATE AND DISPLAY THE LIFELINES (LINKING TO
+		// AN ACTUAL JAVASCRIPT SVG CANVAS).
+	},
+	
+	getYearCoord: function(year) {
+		// Translate a year to a y position on the plot canvas:
+		var fractionOfHeight = (year - this.startYear)/(this.endYear - this.startYear);
+		var yPos = fractionOfHeight*this.canvasHeight;
+		return yPos;
+	}
+
+	generateLifelines: function(algorithm, link2person) {
+		var connectedComponents = getConnectedComponents(this.peopleToPlot, this.link2person);
+		var lifelines = null;
+		return lifelines;
+//	currComponentStartPos = 0
+//	for component in components:
+//		component.selectFocalNode(selectedLineages)
+//		component.assignLifelinePositions(algorithm)
+//		component.adjustForOverlaps()
+//		component.adjustForComponentStartPos()
+//		compoment.calculateTotalWidth()
+//		component.setAbsolutePositions() // add width to start position, plus a gap, and convert to actual canvas x positions
+	}
+}
+
+
+// Lifeline class - a rectangular representation of a person's lifespan,
+// within a lifeline plot:
+function Lifeline(person, width, parentPlot) {
+	this.person = person;
+	this.xStart = null;
+	this.yStart = null;
+	this.yEnd = null;
+	this.boxWidth = width;
+}
+
+
+// Methods of lifeline class: XXX
+Lifeline.prototype = {
+}
+
+
 // Connected component class:
 function ConnectedComponent() {
 	this.nodes = [];
@@ -49,7 +160,7 @@ function ConnectedComponent() {
 
 ConnectedComponent.prototype = {
 	addNode: function(node) {
-		this.nodes.push(nodes);
+		this.nodes.push(node);
 	}
 }
 
@@ -197,7 +308,7 @@ function expandIndividuals(seedPeople, depth, link2person) {
 }
 
 
-function breadthFirstSearch(rootPerson, peopleAdded, personFilter) {
+function breadthFirstSearch(rootPerson, peopleAdded, personFilter, link2person) {
 	// NOTE: personFilter is a set of person links denoting people that can
 	// be included; all others should be ignored.
 
@@ -206,68 +317,101 @@ function breadthFirstSearch(rootPerson, peopleAdded, personFilter) {
 	var stack = [];
 	stack.push(rootPerson);
 
+	console.log("TRACE: Performing breadthFirstSearch from this root person:");
+	console.log(rootPerson);
+	
 	while (stack.length > 0) {
 		var currPerson = stack.pop();
-		if (personFilter.has(currPerson.link)) {
+		//console.log("currPerson:");
+		//console.log(currPerson);
+
+		//console.log("personFilter:");
+		//console.log(personFilter);
+		//console.log(personFilter.has(currPerson));
+
+		if (personFilter.has(currPerson)) {
+			//console.log("Branching from current person...");
+			//console.log("TRACE: Connected component:");
+			//console.log(connectedComponent);
+
 			// The person is allowed to be added and branched from.
 			connectedComponent.addNode(currPerson);
+
+			//console.log("TRACE AGAIN: Connected component:");
+			//console.log(connectedComponent);
 			
-			peopleAdded.add(currPerson.link);
-			var relatives = currPerson.getRelatives();
+			peopleAdded.add(currPerson);
+ 			//console.log("TRACE XXX: peopleAdded:");
+			//console.log(peopleAdded);
+
+			var actualPersonObj = link2person[currPerson];
+
+			var relatives = actualPersonObj.getRelatives();
 			var nRelatives = relatives.length;
-			if (var relativeIdx = 0; relativeIdx < nRelatives; relativeIdx++) {
-				var currRelative = relatives[nRelatives];
-				stack.push(currRelative);
+
+			for (var relativeIdx = 0; relativeIdx < nRelatives; relativeIdx++) {
+				var currRelativeObj = relatives[relativeIdx];
+				// Only add item to the stack if it's in the filtered set of
+				// people and they haven't already been added to a
+				// connected component:
+				if (personFilter.has(currRelativeObj.link) && !(peopleAdded.has(currRelativeObj.link))) {
+					stack.push(currRelativeObj.link);
+				}
 			}
+
+			//console.log("TRACE: Stack after adding relatives:");
+			//console.log(stack);
 		}
 	}
 	
+	console.log("Completed.");
+
 	return connectedComponent;
 }
 
 
-function getConnectedComponents(selectedPeople) {
+// FIXME: I have made a mess in these functions in terms of what is a person link
+// and which variables are actual person objects. Also, the naming of variables is ambiguous.
+
+function getConnectedComponents(selectedPeople, link2person) {
+	console.log("GETTING CONNECTED COMPONENTS...");
 	// Perform breadth-first search to find the connected components...
 	var componentGraphs = [];
 
 	var peopleAdded = new Set();
 
-	var nPeople = selectedPeople.length;
-	for (personIdx = 0; personIdx < nPeople; personIdx++) {
-		var currPerson = selectedPeople[personIdx];
-		if (!(peopleAdded.has(currPerson.link))) {
+	var selectedPeopleArr = Array.from(selectedPeople);
+	
+	console.log("Selected people:");
+	console.log(selectedPeopleArr);
+	
+	var nPeople = selectedPeopleArr.length;
+	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
+		currPerson = selectedPeopleArr[personIdx];
+		
+		if (!(peopleAdded.has(currPerson))) {
 			// The person has not been added to a connected component yet
-			// => perform breadth-first search from it, keeping track
+			// => perform (filtered) breadth-first search from it, keeping track
 			// of added nodes...
-			var currComponent = breadthFirstSearch(currPerson, peopleAdded, personFilter);
+			// NOTE: Only the specified "selected people" will be included in
+			// the breadth-first search:
+			console.log("TRACE: peopleAdded:");
+			console.log(peopleAdded);
+			var currComponent = breadthFirstSearch(currPerson, peopleAdded, selectedPeople, link2person);
 			componentGraphs.push(currComponent);
 		}
 	}
 
-	// XXX CONTINUE HERE: Test and debug this new code.
+	console.log("Component graphs:");
+	console.log(componentGraphs);
+	console.log("Finished getting connected components.");
 
 	// Return components (as an array of TimelineConnComp objects):
 	return componentGraphs;
 }
 
 
-function generateLifelines(selectedPeople, selectedLineages, algorithm) {
-	var connectedComponents = getConnectedComponents(selectedPeople);
-	console.log(connectedComponents);
-	var lifelines = null;
-	return lifelines;
-//	currComponentStartPos = 0
-//	for component in components:
-//		component.selectFocalNode(selectedLineages)
-//		component.assignLifelinePositions(algorithm)
-//		component.adjustForOverlaps()
-//		component.adjustForComponentStartPos()
-//		compoment.calculateTotalWidth()
-//		component.setAbsolutePositions() // add width to start position, plus a gap, and convert to actual canvas x positions
-}
-
-
-function displayLifelines(selectedPeople, selectedLineages) {
+function displayLifelines(selectedPeople, selectedLineages, link2person) {
 	// Overview:
 	/*
 	-- Function to display a given ancestry graph consisting of
@@ -291,7 +435,11 @@ function displayLifelines(selectedPeople, selectedLineages) {
 
 	var layoutAlgorithm = null; // XXX EDIT THIS
 
-	var lifelines = generateLifelines(selectedPeople, layoutAlgorithm);
+	// Set up a lifeline plot, to contain the lifeline bars:
+	var lifelinePlot = new LifelinePlot(selectedPeople, link2person);
+	console.log(lifelinePlot);
+	lifelinePlot.setUpCanvas();
+	lifelinePlot.generateLifelines(layoutAlgorithm);
 	//displayBoxes(lifelines)
 }
 
@@ -304,8 +452,8 @@ function updateLifelines(personName2link, lineageName2link, link2person, link2li
 	//var specifiedLineages = params[1];
 	
 	// TEST: REMOVE THESE TWO LINES ONCE PARAMETER EXTRACTION ABOVE IS WORKING:
-	var specifiedLineages = [link2lineage["/wiki/List_of_Swedish_monarchs"], link2lineage["/wiki/List_of_French_monarchs"]];
-	var specifiedPeople = [link2person["/wiki/Henry_VIII_of_England"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];
+	var specifiedLineages = [link2lineage["/wiki/List_of_Swedish_monarchs"]];//, link2lineage["/wiki/List_of_French_monarchs"]];
+	var specifiedPeople = [];//[link2person["/wiki/Henry_VIII_of_England"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];
 
 	var peopleArrs = specifiedLineages.map(function (lineage) {return lineage.getPeople()});
 	var peopleInLineages = Array.from(new Set(peopleArrs.reduce(function (list1, list2, currentIndex, array) {return list1.concat(list2)})));
@@ -317,13 +465,12 @@ function updateLifelines(personName2link, lineageName2link, link2person, link2li
 	// Retrieve the current depth setting from the interface:
 	// XXX
 
-	// SOME WEIRD BUG HERE.	
-	depth = 4;
+	depth = 3;
 
 	expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	console.log("UPDATED:");
 	console.log(expandedIndividuals);
-	displayLifelines(expandedIndividuals, lineages)
+	displayLifelines(expandedIndividuals, specifiedLineages, link2person);
 }
 
 
