@@ -87,18 +87,120 @@ function getEndDeath(selectedPeople, link2person) {
 }
 
 
+// A component of a lifeline plot, consisting of a set of interconnected
+// lifeline bars:
+function LifelinePlotComponent(peopleLinks, hostPlot) {
+	this.peopleLinks = peopleLinks;
+	this.hostPlot = hostPlot;
+
+	// FIXME: Not sure about this: I believe I am duplicating data here, as I
+	// have a link to the person objects directly, and also via their lifeline
+	// objects:
+	this.link2lifeline = {};
+}
+
+
+LifelinePlotComponent.prototype = {
+	// Generates a Lifeline object for each person. Also, generates relevant
+	// parent-child links, as Birthline objects:
+	generateLifelines: function() {
+		for (var personIdx = 0; personIdx < this.peopleLinks.length; personIdx++) {
+			var currPersonLink = this.peopleLinks[personIdx];
+			var currPerson = this.hostPlot.link2person[currPersonLink];
+
+			var currLifeline = new Lifeline(currPerson, this);
+			this.link2lifeline[currPersonLink] = currLifeline;
+		}
+	},
+
+	// Generates Birthline objects for all Lifeline objects:
+	generateBirthlines: function() {
+		for (var link in this.link2lifeline) {
+			var currLifeline = this.link2lifeline[link];
+
+			// Make mother and father links if those individuals
+			// are amongst the people to be plotted:
+			var mother = currLifeline.person.mother;
+			var father = currLifeline.person.father;
+
+			if (mother !== undefined && this.hostPlot.peopleToPlot.has(mother.link)) {
+				var motherLifeline = this.link2lifeline[mother.link];
+				currLifeline.motherBirthline = new Birthline(currLifeline, motherLifeline);
+			}
+
+			if (father !== undefined && this.hostPlot.peopleToPlot.has(father.link)) {
+				var fatherLifeline = this.link2lifeline[father.link];
+				currLifeline.fatherBirthline = new Birthline(currLifeline, fatherLifeline);
+			}
+		}
+	},
+	
+	// Assign relative positions to Lifeline objects in this lifeline
+	// plot component:
+	// FIXME/NOTE: This is where an algorithm could be specified as an
+	// argument.
+	assignRelativePositions: function() {
+		// Finds coordinates for all individuals in the connected component
+		// relative to the chosen focus node for this component graph.
+
+		// XXX CONTINUE HERE: Review my planned algorithm and implement it here.
+		
+		// NOTE: I THINK THESE ARE PARTS OF THIS ALGORITHM, TO GO HERE:
+		//		component.selectFocalNode(selectedLineages)
+		//		component.assignLifelinePositions(algorithm)
+		//		component.adjustForOverlaps()
+
+	--- Inputs:
+	---- Starting "focal point" node needs to be set for this component
+	---- Index of link to node (not sure if I need this)
+	---- All nodes in the connected component
+
+	--- Algorithm:
+	---- Assign the focal point node a position of zero
+	---- Add (focalNode, 0) to the evaluation stack
+	---- While evaluation stack is not empty:
+	----- Pop top element and call evaluatePositions(currNode, currPos)
+
+	},
+	
+	selectFocalNode: function(selectedLineages) {
+		// Find a chosen node of interest for this connected component (e.g.
+		// the most recent individual who is part of any of the lineages
+		// specified):
+		// XXX
+	},
+	
+	evaluatePositions: function() {
+		// NOTE: I need to sort some details out here, such as what the input parameters are, and how/where this "evaluation stack" is maintained.
+		- NOTE: The following algorithm makes no attempt to balance the tree aesthetically. I will have to see what it looks like before deciding whether I need a better layout algorithm
+		- Algorithm for assigning positions, given a node, specified position X for that node, a dictionary of URL->node pairs, indicating which nodes have been assigned positions already, and a stack of (node, position) objects to evaluate next.
+		---- If mother node position not already determined (i.e. not in the dictionary)
+		----- Assign mother node the position X - 1
+		----- Add (mother, X-1) tuple to evaluation stack
+		---- If father node position not already determined (i.e. not in the dictionary)
+		----- Assign father node the position X + 1
+		----- Add (father, X+1) tuple to evaluation stack
+		---- For each child:
+		----- Assign child node integer positions, keeping them balanced either side of X (e.g. X-1, X, X+1 for three nodes, or X-2, X-1, X+1, X+2 for four nodes).
+		----- Add them to the evaluation stack
+	}
+}
+
+
 // A plot of a set of lifeline bars:
-function LifelinePlot(selectedPeople, link2person, height) {
+function LifelinePlot(svgTarget, selectedPeople, selectedLineages, link2person) {
+	// - Precondition: The input svg display must be blank when this method is invoked
+
 	this.startYear = null; // Year corresponding to the start of the plot
 	this.endYear = null; // Year corresponding to the end of the plot
-	this.canvasHeight = height;
 	this.peopleToPlot = selectedPeople;
 	this.link2person = link2person;
+	this.plotComponents = [];
 }
 
 
 LifelinePlot.prototype = {
-	setUpCanvas: function() {
+	calculateBoundaryYears: function() {
 		// Calibrate the canvas start and end year based on the earliest birth
 		// and last death dates:
 		this.startYear = getFirstBirth(this.peopleToPlot, this.link2person);
@@ -107,48 +209,109 @@ LifelinePlot.prototype = {
 		console.log("TRACE: Years for plot:");
 		console.log(this.startYear);
 		console.log(this.endYear);
-		
-		// XXX CONTINUE HERE:
-		// XXX PLAN OUT HOW TO USE THIS LIFELINEPLOT TO GENERATE AND DISPLAY THE LIFELINES (LINKING TO
-		// AN ACTUAL JAVASCRIPT SVG CANVAS).
 	},
 	
 	getYearCoord: function(year) {
+		var bBox = this.svgTarget.getBBox();
+	
 		// Translate a year to a y position on the plot canvas:
 		var fractionOfHeight = (year - this.startYear)/(this.endYear - this.startYear);
-		var yPos = fractionOfHeight*this.canvasHeight;
+		var yPos = fractionOfHeight*bBox.height; // XXX I think this will work; but PROBLEM: Doesn't consider margins that I might wish to include around the plot itself.
 		return yPos;
-	}
+	},
 
-	generateLifelines: function(algorithm, link2person) {
+	displayLifelines: function() {
+		// Overview:
+		/*
+		-- Displays a given ancestry graph consisting of
+		1) A set of individuals with birth and death dates
+		2) A set of zero or more royalty titles with date ranges and corresponding
+		individuals specified (it may be important for this to be indexed for
+		efficient retrieval)
+		3) A set of individual->individual edges indicating parent-child
+		relationships, labelled as mother or father. NOTE: I need this data
+		structure in a form that is computationally efficient to retrieve edges
+		from. It might be necessary to have a sparse 2D matrix, but this would be
+		large. -> Update: Not sure about my thinking here; I think it should be ok
+		just having a dictionary indexed by person links, and by then looking in
+		the mother/father/child fields for the given person of interest.
+		--- Assigns x positions to all selected individuals (call function that
+		does this)
+		--- Draws rectangles and lines connecting them to represent those
+		individuals and parent-child relationships
+		--- Colours regions within rectangles to represent the specified titles
+		*/
+
+		var layoutAlgorithm = null; // XXX EDIT THIS
+
+		// Calculate the start and end year for the plot:
+		this.calculateBoundaryYears();
+
+		// Determine connected components from the specified people to plot:
 		var connectedComponents = getConnectedComponents(this.peopleToPlot, this.link2person);
-		var lifelines = null;
-		return lifelines;
-//	currComponentStartPos = 0
-//	for component in components:
-//		component.selectFocalNode(selectedLineages)
-//		component.assignLifelinePositions(algorithm)
-//		component.adjustForOverlaps()
-//		component.adjustForComponentStartPos()
-//		compoment.calculateTotalWidth()
-//		component.setAbsolutePositions() // add width to start position, plus a gap, and convert to actual canvas x positions
+
+		// Produce plot components corresponding to the connected components:
+		for (var compIdx = 0; compIdx < connectedComponents.length; compIdx++) {
+			var currComponent = connectedComponents[compIdx];
+			var currPlotComponent = new LifelinePlotComponent(currComponent.nodes, this);
+
+			// Generate lifeline objects for each of the people in the current
+			// plot component. Here, also Generate parent/child links:
+			currPlotComponent.generateLifelines();
+			currPlotComponent.generateBirthlines();
+			currPlotComponent.assignRelativePositions();
+
+			this.plotComponents.push(currPlotComponent);
+		}
+
+		console.log(this);
+
+		// XXX ONCE I'VE IMPLEMENTED THE RELATIVE POSITION DETERMINATION ALGORITHM, THEN IMPLEMENT THIS PART.
+		// -- Render boxes and lines for the lifelines as determined by their relative positions within the connected components and the connected component relative positions and sizes. NOTE: This will involve calculating the absolute positions of the lifelines and parent-child lines. These calculations are specified by the relative positions (which are known by the lifeline objects), the connected component widths (which those objects can compute based on their constituent lifeline objects), the connected component relative positions (which can be assigned using some trivial algorithm and which has no real importance), and target svg canvas size, and the margin size (which is a default parameter of the lifelineplot class). NOTE: I need to decide which object(s) do the calculations of exact object positions. Perhaps the LifelinePlot object takes care of this? Also, I'm pretty sure the individual lifeline and parentChildLink objects should not know about their absolute positions; otherwise we would be duplicating data. However, they have links to their actual rectangle and line objects, so they can retrieve/set those values if needed.
+
+		//	currComponentStartPos = 0
+		//	for component in components:
+		//		component.adjustForComponentStartPos()
+		//		compoment.calculateTotalWidth()
+		//		component.setAbsolutePositions() // add width to start position, plus a gap, and convert to actual canvas x positions
+
+		//displayBoxes(lifelines)
 	}
 }
 
 
 // Lifeline class - a rectangular representation of a person's lifespan,
 // within a lifeline plot:
-function Lifeline(person, width, parentPlot) {
+function Lifeline(person, hostPlot) {
 	this.person = person;
+	this.hostPlot = hostPlot;
+	
+	// Parent/Child birth lines for this individual (as a child):
+	this.motherBirthline = null;
+	this.fatherBirthline = null;
+
+	// XXX FIXME: Perhaps these position fields will just be represented in the svgRectangle, rather than being specified here?:
 	this.xStart = null;
 	this.yStart = null;
 	this.yEnd = null;
-	this.boxWidth = width;
+	this.boxWidth = null;
+	this.svgRectangle = null;
+	
+	// XXX Should the lifeline have a set of links to child lifelines? Should it have a mother and father link?
 }
 
 
 // Methods of lifeline class: XXX
 Lifeline.prototype = {
+}
+
+
+// Birthline class: A line representing the relationship between this parent
+// and this child at the year of birth:
+function Birthline(childLifeline, parentLifeline) {
+	this.childLifeline = childLifeline;
+	this.parentLifeline = parentLifeline;
+	this.svgLine = null;
 }
 
 
@@ -411,40 +574,7 @@ function getConnectedComponents(selectedPeople, link2person) {
 }
 
 
-function displayLifelines(selectedPeople, selectedLineages, link2person) {
-	// Overview:
-	/*
-	-- Function to display a given ancestry graph consisting of
-	1) A set of individuals with birth and death dates
-	2) A set of zero or more royalty titles with date ranges and corresponding
-	individuals specified (it may be important for this to be indexed for
-	efficient retrieval)
-	3) A set of individual->individual edges indicating parent-child
-	relationships, labelled as mother or father. NOTE: I need this data
-	structure in a form that is computationally efficient to retrieve edges
-	from. It might be necessary to have a sparse 2D matrix, but this would be
-	large. -> Update: Not sure about my thinking here; I think it should be ok
-	just having a dictionary indexed by person links, and by then looking in
-	the mother/father/child fields for the given person of interest.
-	--- Assigns x positions to all selected individuals (call function that
-	does this)
-	--- Draws rectangles and lines connecting them to represent those
-	individuals and parent-child relationships
-	--- Colours regions within rectangles to represent the specified titles
-	*/
-
-	var layoutAlgorithm = null; // XXX EDIT THIS
-
-	// Set up a lifeline plot, to contain the lifeline bars:
-	var lifelinePlot = new LifelinePlot(selectedPeople, link2person);
-	console.log(lifelinePlot);
-	lifelinePlot.setUpCanvas();
-	lifelinePlot.generateLifelines(layoutAlgorithm);
-	//displayBoxes(lifelines)
-}
-
-
-function updateLifelines(personName2link, lineageName2link, link2person, link2lineage) {
+function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2person, link2lineage) {
 	// User can select a set of lineages of interest and a set of additional individuals of interest.
 	// XXX NEXT: Implement extractParamsFromInterface() and then test it + get it working here:
 	//var params = extractParamsFromInterface();
@@ -470,7 +600,20 @@ function updateLifelines(personName2link, lineageName2link, link2person, link2li
 	expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	console.log("UPDATED:");
 	console.log(expandedIndividuals);
-	displayLifelines(expandedIndividuals, specifiedLineages, link2person);
+
+	// Clear the svg element, as it must be blank prior to generating a new
+	// lifeline plot using it:
+	clearSVG(targetSVG);
+
+	newPlot = new LifelinePlot(targetSVG, expandedIndividuals, specifiedLineages, link2person);
+	newPlot.displayLifelines();
+}
+
+
+function clearSVG(svg) {
+	while (svg[0][0].lastChild) {
+	    svg[0][0].removeChild(svg[0][0].lastChild);
+	}
 }
 
 
@@ -558,9 +701,11 @@ d3.json("Test.json", function(error, jsonObj) {
 	console.log(personName2link);
 	console.log(lineageName2link)
 
-	// Perhaps I need to create or select the canvas element here, to be specified as a parameter to displayLifelines and updateLifelines?
-	updateLifelines(personName2link, lineageName2link, link2person, link2lineage);
-	//interface.onClick = updateLifelines(personName2link, lineageName2link, link2person, link2lineage);
+	// Retrieve the svg target element from the webpage:
+	var svgTarget = d3.select("#lifelinePlotSvg");
+	
+	updateLifelinePlot(svgTarget, personName2link, lineageName2link, link2person, link2lineage);
+	//interface.onClick = updateLifelinePlot(personName2link, lineageName2link, link2person, link2lineage);
 });
 
 
