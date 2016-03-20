@@ -256,7 +256,7 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
     individuals = []
 
     # While the stack is not empty...
-    while len(linksInspected) < 100:# and len(linksToInspect) > 0:
+    while len(linksToInspect) > 0:#len(linksInspected) < 500:# and
         print >> sys.stderr, "Inspected:", len(linksInspected)
         # Get the next individual to inspect:
         currLink = linksToInspect.pop()
