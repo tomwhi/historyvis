@@ -879,6 +879,9 @@ Lineage.prototype = {
 			var currReign = reigns[reignIdx];
 			people.add(currReign.person);
 		}
+		
+		debugger;
+		
 		return Array.from(people);
 	}
 }
