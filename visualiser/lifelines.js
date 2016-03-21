@@ -880,8 +880,6 @@ Lineage.prototype = {
 			people.add(currReign.person);
 		}
 		
-		debugger;
-		
 		return Array.from(people);
 	}
 }
