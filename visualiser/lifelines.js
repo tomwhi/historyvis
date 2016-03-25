@@ -81,7 +81,7 @@ function getEndDeath(selectedPeople, link2person) {
 	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
 		currPersonObj = link2person[peopleArr[personIdx]];
 		if (currPersonObj.death > lastDeathDate) {
-			lastBirthDate = currPersonObj.death;
+			lastDeathDate = currPersonObj.death;
 		}
 		
 		// If no death is given, then the person is assumed to still
@@ -252,12 +252,12 @@ LifelinePlotComponent.prototype = {
 		if (mother !== undefined) {
 			var motherLifeline = this.link2lifeline[mother.link];
 			if (motherLifeline !== undefined) {
+				var proposedPos = currGridPos - 1;
 				if (motherLifeline.gridPosition === null) {
-					motherLifeline.gridPosition = currGridPos - 1;
+					motherLifeline.gridPosition = proposedPos;
 					evaluationStack.push(motherLifeline);
-				} else {
-					//console.log("NOTE: Mother already had position assigned!");
-					//console.log(motherLifeline);
+				} else if (proposedPos != motherLifeline.gridPosition) {
+					console.log("Conflicting position for mother.");
 				}
 			}
 		}
@@ -266,12 +266,12 @@ LifelinePlotComponent.prototype = {
 		if (father !== undefined) {
 			var fatherLifeline = this.link2lifeline[father.link];
 			if (fatherLifeline !== undefined) {
+				var proposedPos = currGridPos + 1;
 				if (fatherLifeline.gridPosition === null) {
-					fatherLifeline.gridPosition = currGridPos + 1;
+					fatherLifeline.gridPosition = proposedPos;
 					evaluationStack.push(fatherLifeline);
-				} else {
-					//console.log("NOTE: Father already had position assigned!");
-					//console.log(fatherLifeline);
+				} else if (proposedPos != fatherLifeline.gridPosition) {
+					console.log("Conflicting position for father.");
 				}
 			}
 		}
@@ -282,17 +282,20 @@ LifelinePlotComponent.prototype = {
 			var currChild = children[childIdx];
 			var currChildLifeline = this.link2lifeline[currChild.link];
 			var childLink = currChild.link;
-			if (currChildLifeline !== undefined) {
+			if (currChildLifeline !== undefined) {				
+				var proposedPosition = currGridPos - 1;
+				if (currChild.mother === person) {
+					proposedPosition = currGridPos + 1;
+				}
 				if (currChildLifeline.gridPosition === null) {
-					if (currChild.mother === person) {
-						currChildLifeline.gridPosition = currGridPos + 1;
-					} else {
-						currChildLifeline.gridPosition = currGridPos - 1;
-					}
+					currChildLifeline.gridPosition = proposedPosition;
 					evaluationStack.push(currChildLifeline);
 				} else {
-					//console.log("NOTE: Child already had position assigned!");
-					//console.log(currChildLifeline);
+					if (proposedPos != currChildLifeline.gridPosition) {
+						console.log("Conflicting position for child.");
+					} else {
+						console.log("Child position was consistent.");
+					}
 				}
 			}
 		}
@@ -426,9 +429,11 @@ LifelinePlotComponent.prototype = {
 		// in decomposing this logic into smaller parts.
 		//console.log("Getting focal person.");
 		//console.log((new Date()).getTime());
+				
 		var focalPerson = this.selectFocalPerson();
 
 		// Get the timeline for that person:
+		console.log(focalPerson);
 		var focalTimeline = this.link2lifeline[focalPerson.link];
 
 		this.assignStartingPositions(focalTimeline);
@@ -463,7 +468,7 @@ LifelinePlotComponent.prototype = {
 			}			
 		}
 		
-		if (peopleInLineagesLinks.length == 0) {
+		if (Array.from(peopleInLineagesLinks).length == 0) {
 			// There were no individuals in the specified lineages =>
 			// Consider all individuals:
 			peopleInLineagesLinks = new Set(this.peopleLinks);
@@ -632,6 +637,7 @@ LifelinePlot.prototype = {
 			// plot component. Here, also Generate parent/child links:
 			currPlotComponent.generateLifelines();
 			currPlotComponent.generateBirthlines();
+			
 			currPlotComponent.assignRelativePositions();
 
 			this.plotComponents.push(currPlotComponent);
@@ -933,6 +939,7 @@ function populateInterface(personNames, lineageNames) {
 
 function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 	var currPersonLink = branchingStack.pop();
+
 	var currPerson = link2person[currPersonLink];
 	
 	outputSet.add(currPerson.link);
@@ -944,6 +951,7 @@ function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 		var nRelatives = relatives.length;
 		for (var relativeIdx = 0; relativeIdx < nRelatives; relativeIdx++) {
 			var relative = relatives[relativeIdx];
+
 			if (!(outputSet.has(relative.link))) {
 				// Relative has not yet been explored:
 				if (!(relative.link in branchingStack)) {
@@ -974,7 +982,7 @@ function expandIndividuals(seedPeople, depth, link2person) {
 	// Maintain a dictionary indicating depth for each person:
 	var personLink2depth = {};
 	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
-		currPerson = seedPeople[personIdx];
+		var currPerson = seedPeople[personIdx];
 		personLink2depth[currPerson.link] = depth;
 	}
 
@@ -1101,11 +1109,14 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	//var specifiedLineages = params[1];
 	
 	// TEST: REMOVE THESE TWO LINES ONCE PARAMETER EXTRACTION ABOVE IS WORKING:
-	var specifiedLineages = [link2lineage["/wiki/List_of_Danish_monarchs"]];// Swedish, /wiki/Holy_Roman_Emperor link2lineage["/wiki/List_of_French_monarchs"]];
-	var specifiedPeople = [];//[link2person["/wiki/Henry_VIII_of_England"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];
+	var specifiedLineages = [link2lineage["/wiki/List_of_Swedish_monarchs"]];// Swedish, /wiki/Holy_Roman_Emperor link2lineage["/wiki/List_of_French_monarchs"]];//];//
+	var specifiedPeople = [link2person["/wiki/Frederick_I_of_Sweden"]];//[link2person["/wiki/Henry_VIII_of_England"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];
 
-	var peopleArrs = specifiedLineages.map(function (lineage) {return lineage.getPeople()});
-	var peopleInLineages = Array.from(new Set(peopleArrs.reduce(function (list1, list2, currentIndex, array) {return list1.concat(list2)})));
+	var peopleInLineages = [];
+	if (specifiedLineages.length > 0) {
+		var peopleArrs = specifiedLineages.map(function (lineage) {return lineage.getPeople()});
+		var peopleInLineages = Array.from(new Set(peopleArrs.reduce(function (list1, list2, currentIndex, array) {return list1.concat(list2)})));
+	}
 	var seedIndividuals = new Set(peopleInLineages.concat(specifiedPeople));
 
 	//console.log("SEED:");
@@ -1114,9 +1125,9 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	// Retrieve the current depth setting from the interface:
 	// XXX
 
-	depth = 2;
+	depth = 15;
 
-	expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
+	var expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	//console.log("UPDATED:");
 	//console.log(expandedIndividuals);
 
