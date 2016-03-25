@@ -1125,7 +1125,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	// Retrieve the current depth setting from the interface:
 	// XXX
 
-	depth = 15;
+	depth = 3;
 
 	var expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	//console.log("UPDATED:");
