@@ -704,6 +704,9 @@ function Lifeline(person, hostComponent) {
 
 	this.svgRectangle = null;
 	
+	// Bars indicating periods as a reigning monarch:
+	this.reignBars = [];
+	
 	// XXX Should the lifeline have a set of links to child lifelines? Should it have a mother and father link?
 }
 
@@ -747,6 +750,36 @@ Lifeline.prototype = {
 
 		if (this.fatherBirthline !== null) {
 			this.fatherBirthline.draw();
+		}
+		
+		// Draw reigns for this lifeline:
+		this.drawReigns();
+	},
+
+	drawReigns: function() {
+		// FIXME: Perhaps need to think about how to do this a bit more.
+		var lineagesToShowLinks = new Set(this.hostComponent.hostPlot.lineagesToShow.map(function(x) {return x.link}));
+
+		// Draw each reign of this individual for any of those lineages...
+		for (var reignIdx = 0; reignIdx < this.person.reigns.length; reignIdx++) {
+			var currReign = this.person.reigns[reignIdx];
+			var currLineageLink = currReign.lineage.link;
+			if (lineagesToShowLinks.has(currLineageLink)) {
+				// We should draw this Reign object. Currently, just draw a
+				// rectangle. FIXME: Revisit this:
+				var yStart = this.hostComponent.hostPlot.convertYpos(currReign.start);
+				var yEnd = this.hostComponent.hostPlot.convertYpos(currReign.end);
+				var xStart = this.getXstart();
+				var boxWidth = this.hostComponent.hostPlot.boxWidth;
+				reignRectangle = this.hostComponent.hostPlot.svgTarget.append("rect")
+								   					   .attr("x", xStart)
+													   .attr("y", yStart)
+													   .attr("width", boxWidth)
+													   .attr("height", yEnd-yStart)
+													   .attr("fill", "yellow")
+													   .attr("stroke", "yellow");
+				this.reignBars.push(reignRectangle);
+			}
 		}
 	},
 	
