@@ -39,6 +39,21 @@ Person.prototype = {
 		return relatives.concat(this.children);
 	},
 
+	getParents: function() {
+		var parents = [];
+		if(!(typeof this.mother === 'undefined')){
+	    	parents.push(this.mother);
+		};
+		if(!(typeof this.father === 'undefined')){
+	    	parents.push(this.father);
+		};
+		return parents;
+	},
+
+	getChildren: function() {
+		return this.children;
+	},
+
 	getDeath: function() {
 		if (this.death === null) {
 			var today = new Date();
@@ -971,15 +986,25 @@ function populateInterface(personNames, lineageNames) {
 
 
 function processTopOfStack(branchingStack, depths, outputSet, link2person) {
-	var currPersonLink = branchingStack.pop();
+	var topOfStack = branchingStack.pop();
+	var currPersonLink = topOfStack[0];
+	var addedAsChild = topOfStack[1];
 
 	var currPerson = link2person[currPersonLink];
 	
 	outputSet.add(currPerson.link);
-	
+
+	var parentLinks = new Set(currPerson.getParents().map(function(x) {return x.link}));
+	var childLinks = new Set(currPerson.getChildren().map(function(x) {return x.link}));
+		
 	if (depths[currPerson.link] > 0) {
 		var relativeDepth = depths[currPerson.link] - 1;
 		var relatives = currPerson.getRelatives();
+		if (addedAsChild) {
+			// Only consider the parents if this person was added for
+			// expansion as a child:
+			relatives = currPerson.getParents();
+		}
 		
 		var nRelatives = relatives.length;
 		for (var relativeIdx = 0; relativeIdx < nRelatives; relativeIdx++) {
@@ -988,7 +1013,11 @@ function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 			if (!(outputSet.has(relative.link))) {
 				// Relative has not yet been explored:
 				if (!(relative.link in branchingStack)) {
-					branchingStack.push(relative.link);
+					if (parentLinks.has(relative.link)) {
+						branchingStack.push([relative.link, false]);
+					} else {
+						branchingStack.push([relative.link, true]);
+					}
 				}
 				if ((!(relative.link in depths)) || (depths[relative.link] < relativeDepth)) {
 					depths[relative.link] = relativeDepth;
@@ -999,7 +1028,11 @@ function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 				if (depths[relative.link] < relativeDepth) {
 					depths[relative.link] = relativeDepth;
 					if (!(relative.link in branchingStack)) {
-						branchingStack.push(relative.link);
+						if (parentLinks.has(relative.link)) {
+							branchingStack.push([relative.link, false]);
+						} else {
+							branchingStack.push([relative.link, true]);
+						}
 					}
 				}
 			}
@@ -1019,8 +1052,12 @@ function expandIndividuals(seedPeople, depth, link2person) {
 		personLink2depth[currPerson.link] = depth;
 	}
 
+	// Implementing a refined approach for branching: The behaviour will
+	// differ when branching from a child node, compared to other nodes
+	// (starting node or parent node).
+
 	// Also maintain a stack of people left to branch from:
-	var branchingStack = seedPeople.map(function(person) {return person.link});
+	var branchingStack = seedPeople.map(function(person) {return [person.link, false]});
 
 	// Also maintain a set of people to output:
 	var outputSet = new Set();
@@ -1143,7 +1180,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	
 	// TEST: REMOVE THESE TWO LINES ONCE PARAMETER EXTRACTION ABOVE IS WORKING:
 	var specifiedLineages = [link2lineage["/wiki/List_of_Swedish_monarchs"]];// Swedish, /wiki/Holy_Roman_Emperor link2lineage["/wiki/List_of_French_monarchs"]];//];//
-	var specifiedPeople = [link2person["/wiki/Frederick_I_of_Sweden"]];//[link2person["/wiki/Henry_VIII_of_England"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];
+	var specifiedPeople = [link2person["/wiki/Louis_XIV_of_France"]];//[link2person["/wiki/Frederick_I_of_Sweden"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];///wiki/Henry_VIII_of_England
 
 	var peopleInLineages = [];
 	if (specifiedLineages.length > 0) {
@@ -1158,7 +1195,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	// Retrieve the current depth setting from the interface:
 	// XXX
 
-	depth = 3;
+	depth = 2;
 
 	var expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	//console.log("UPDATED:");
