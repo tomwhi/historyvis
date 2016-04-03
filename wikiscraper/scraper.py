@@ -242,9 +242,26 @@ class Person:
     def addChild(self, child):
         self.children.append(child)
 
+    def getMother(self):
+        return self.mother
+
+    def getFather(self):
+        return self.father
+
+    def getChildren(self):
+        return self.children
+
+    def getRelatives(self):
+        relatives = self.getChildren()[:]
+        if self.getMother() != None:
+            relatives.append(self.getMother())
+        if self.getFather() != None:
+            relatives.append(self.getFather())
+        return relatives
+
 
 #@profile
-def scrapeIndividualData(individualLinks, lineage2canonical):
+def scrapeIndividualData(individualLinks, lineage2canonical, limit = None):
     # Create empty set of people (whose wikipedia page I have inspected):
     linksInspected = set()
 
@@ -255,8 +272,12 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
     link2canonical = {}
     individuals = []
 
+    # Hack: Adding this to facilitate trimming/fixing of assymetrical links
+    # following scraping:
+    link2person = {}
+
     # While the stack is not empty...
-    while len(linksToInspect) > 0:#len(linksInspected) < 500:# and
+    while len(linksToInspect) > 0 and (limit < 0 or len(linksInspected) < limit):
         print >> sys.stderr, "Inspected:", len(linksInspected)
         # Get the next individual to inspect:
         currLink = linksToInspect.pop()
@@ -265,6 +286,7 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
             print >> sys.stderr, "Inspecting link:", currLink
             try:
                 currPerson = Person(currLink, lineage2canonical)
+
                 resolvedLink = currPerson.link
                 link2canonical[currLink] = resolvedLink
                 # FIX:
@@ -274,6 +296,11 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
                 if not resolvedLink in linksInspected:
                     individuals.append(currPerson)
                     linksInspected.add(resolvedLink)
+
+                    # Hack: I *think* this is the data structure I need to fix
+                    # links following scraping (i.e. the *resolved* link as key
+                    # and the person as value):
+                    link2person[resolvedLink] = currPerson
 
                     for personLink in [currPerson.mother, currPerson.father] + currPerson.children:
                         if not personLink in linksInspected and personLink != None:
@@ -288,7 +315,89 @@ def scrapeIndividualData(individualLinks, lineage2canonical):
     for individual in individuals:
         individual.correctLinks(link2canonical)
 
-    return individuals
+    return (individuals, link2person)
+
+
+def fixLinks(individuals, link2person):
+    '''Either trim away inconsistent links or else repair them.'''
+
+    for person in individuals:
+        # Check that all links are symmetrical. If one individual links to
+        # another and the other doesn't link back, then either trim the
+        # link away or instate it, as indicated:
+
+        relativeLinks = person.getRelatives()
+        for relativeLink in relativeLinks:
+            relative = link2person[relativeLink]
+            fixLink(person, relative)
+
+
+def fixLink(person1, person2):
+    '''Check the link between the two people. It should be symmetrical. If not,
+    then fix as instructed.'''
+
+    # FIXME: Horrible hacky code, but it should work:
+    child = None
+    parent = None
+    if (person1.mother == person2.link):
+        child = person1
+        parent = person2
+    elif (person1.father == person2.link):
+        child = person1
+        parent = person2
+    elif (person2.mother == person1.link):
+        child = person2
+        parent = person1
+    elif (person2.father == person1.link):
+        child = person2
+        parent = person1
+    elif (person2.link in person1.children):
+        child = person2
+        parent = person1
+    else:
+        if not (person1.link in person2.children):
+            #pdb.set_trace()
+            #dummy = 1
+            # FIXME: SOME WEIRD BUG HERE:
+            print >> sys.stderr, "APPARENT ERROR:", person1.__dict__, person2.__dict__
+        child = person1
+        parent = person2
+
+    fixParentChildLink(child, parent)
+
+
+# NOTE/FIXME: Currently I am forced to trim away assymetrical links rather than
+# repairing them, due to the following issue:
+# Problem: If the child to parent link is the thing that is broken, then I
+# currently have no way of definitely knowing if the parent is the mother or
+# the father of the child, based on the information contained in these objects!
+# So, I am forced to only implement trimming at this point :-(
+# Update: I have now decided to *add* a missing link if only the child->parent
+# information is available, and to delete the link if only the parent->child
+# information is available.
+def fixParentChildLink(child, parent):
+    if child.link in parent.children:
+        # The child is listed for the parent. If the link is not symmetrical,
+        # then remove this link from the parent's list of children:
+        if child.mother != parent.link and child.father != parent.link:
+            childrenAsSet = set(parent.children)
+            print >> sys.stderr, "Trimming parent-child link away. Parent:", parent.link, "Child:", child.link
+            childrenAsSet.remove(child.link)
+            parent.children = list(childrenAsSet)
+
+    if child.mother == parent.link:
+        # The parent is listed as the child's mother. If the link is not
+        # symmetrical, then fix by adding the link to the mother:
+        if not child.link in parent.children:
+            print >> sys.stderr, "Adding parent-child to mother. Mother:", parent.link, "Child:", child.link
+            parent.addChild(child.link)
+
+    if child.father == parent.link:
+        # The parent is listed as the child's father. If the link is not
+        # symmetrical, then fix by adding the link to the mother:
+        if not child.link in parent.children:
+            print >> sys.stderr, "Adding parent-child to father. Father:", parent.link, "Child:", child.link
+            parent.addChild(child.link)
 
 
 def extractPersonLinksFromPages(monarch_list_links, sleep_time = 1):

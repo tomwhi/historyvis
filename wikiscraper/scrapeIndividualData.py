@@ -30,6 +30,10 @@ Outputs:
                       default = "Individuals.json",
                       help = "Name of output file; will be overwritten. " + \
                           "Default=[%default]")
+    parser.add_option("--limit", dest = "limit",
+                      default = -1,
+                      help = "Limit of individuals scraped. " + \
+                          "Default=[%default]")
     parser.add_option("--debug", action="store_true", dest="debug",
                       help = "Debug the program using pdb.")
     (options, args) = parser.parse_args()
@@ -53,7 +57,12 @@ Outputs:
     outfile = codecs.open(options.out, 'w', "utf-8")
     print >> outfile, u"{"
     print >> sys.stderr, "Scraping data..."
-    individuals = scraper.scrapeIndividualData(individuals_list, lineage2canonical)
+    (individuals, link2person) = scraper.scrapeIndividualData(individuals_list, lineage2canonical, limit=int(options.limit))
+
+    # Impose a filter on the links on the individuals data, either filtering
+    # asymmetrical links, or fixing them...
+    scraper.fixLinks(individuals, link2person)
+
     individualStrs = []
     for individual in individuals:
         try:
