@@ -1,3 +1,8 @@
+import Person from 'lineage';
+import Reign from 'lineage';
+import Lineage from 'lineage';
+import LifelinePlot from 'lifelines';
+
 function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 	var topOfStack = branchingStack.pop();
 	var currPersonLink = topOfStack[0];

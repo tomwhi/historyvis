@@ -65,21 +65,20 @@ function adjustGridPositions(cluster, leftEnd, rightEnd) {
 
 // A component of a lifeline plot, consisting of a set of interconnected
 // lifeline bars:
-function LifelinePlotComponent(peopleLinks, hostPlot) {
-	this.peopleLinks = peopleLinks;
-	this.hostPlot = hostPlot;
+export class LifelinePlotComponent {
+	constructor(peopleLinks, hostPlot) {
+		this.peopleLinks = peopleLinks;
+		this.hostPlot = hostPlot;
 
-	// FIXME: Not sure about this: I believe I am duplicating data here, as I
-	// have a link to the person objects directly, and also via their lifeline
-	// objects:
-	this.link2lifeline = {};
-}
+		// FIXME: Not sure about this: I believe I am duplicating data here, as I
+		// have a link to the person objects directly, and also via their lifeline
+		// objects:
+		this.link2lifeline = {};
+	}
 
-
-LifelinePlotComponent.prototype = {
 	// Generates a Lifeline object for each person. Also, generates relevant
 	// parent-child links, as Birthline objects:
-	generateLifelines: function() {
+	generateLifelines() {
 		for (var personIdx = 0; personIdx < this.peopleLinks.length; personIdx++) {
 			var currPersonLink = this.peopleLinks[personIdx];
 			var currPerson = this.hostPlot.link2person[currPersonLink];
@@ -87,10 +86,10 @@ LifelinePlotComponent.prototype = {
 			var currLifeline = new Lifeline(currPerson, this);
 			this.link2lifeline[currPersonLink] = currLifeline;
 		}
-	},
+	}
 
 	// Generates Birthline objects for all Lifeline objects:
-	generateBirthlines: function() {
+	generateBirthlines() {
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
 
@@ -109,18 +108,18 @@ LifelinePlotComponent.prototype = {
 				currLifeline.fatherBirthline = new Birthline(currLifeline, fatherLifeline);
 			}
 		}
-	},
+	}
 	
 	// Adjust the x position of every lifeline in this component, adding
 	// the specified amount...
-	adjustOverallPosition: function(adjustment) {
+	adjustOverallPosition(adjustment) {
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
 			currLifeline.gridPosition += adjustment;
 		}
-	},
+	}
 	
-	evaluatePositions: function(evaluationStack) {
+	evaluatePositions(evaluationStack) {
 		// This sets positions of relatives if they're not already set,
 		// and adds them to the evaluationStack so that their relatives
 		// can also be assigned positions.
@@ -204,9 +203,9 @@ LifelinePlotComponent.prototype = {
 				}
 			}
 		}
-	},
+	}
 
-	assignStartingPositions: function(focalLifeline) {
+	assignStartingPositions(focalLifeline) {
 		// While evaluation stack is not empty:
 		// Pop top element and call evaluatePositions(currNode, currPos)
 
@@ -223,9 +222,9 @@ LifelinePlotComponent.prototype = {
 		while (evaluationStack.length > 0) {
 			this.evaluatePositions(evaluationStack);
 		}
-	},
+	}
 
-	getLifelinesAtPos: function(currGridPos) {
+	getLifelinesAtPos(currGridPos) {
 		var lifelinesAtPos = [];
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
@@ -235,9 +234,9 @@ LifelinePlotComponent.prototype = {
 			}
 		}
 		return lifelinesAtPos;
-	},
+	}
 
-	adjustPositionsForOverlap: function() {
+	adjustPositionsForOverlap() {
 		// Move lifeline objects sideways slightly so that none of them
 		// overlap vertically.
 		
@@ -289,9 +288,9 @@ LifelinePlotComponent.prototype = {
 			
 			currGridPos++;
 		}
-	},
+	}
 
-	getMinGridPos: function() {
+	getMinGridPos()) {
 		var minPos = Infinity;
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
@@ -300,9 +299,9 @@ LifelinePlotComponent.prototype = {
 			}
 		}		
 		return minPos;
-	},
+	}
 
-	getMaxGridPos: function() {
+	getMaxGridPos() {
 		var maxPos = -Infinity;
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
@@ -311,20 +310,20 @@ LifelinePlotComponent.prototype = {
 			}
 		}
 		return maxPos;
-	},
+	}
 
 	// Calculate the width of this component in grid units:
-	getWidth: function() {
+	getWidth() {
 		var maxGridPos = this.getMaxGridPos();
 		var minGridPos = this.getMinGridPos();
         return maxGridPos - minGridPos;
-	},
+	}
 
 	// Assign relative positions to Lifeline objects in this lifeline
 	// plot component:
 	// FIXME/NOTE: This is where an algorithm could be specified as an
 	// argument.
-	assignRelativePositions: function() {
+	assignRelativePositions() {
 		// Finds coordinates for all individuals in the connected component
 		// relative to a chosen focus node for this component graph.
 
@@ -343,9 +342,9 @@ LifelinePlotComponent.prototype = {
 		this.assignStartingPositions(focalTimeline);
 		
 		this.adjustPositionsForOverlap();
-	},
+	}
 	
-	selectFocalPerson: function() {
+	selectFocalPerson() {
 		// Find a chosen node of interest for this connected component (e.g.
 		// the most recent individual who is part of any of the lineages
 		// specified).
@@ -399,9 +398,9 @@ LifelinePlotComponent.prototype = {
 		}
 		
 		return youngestPerson;
-	},
+	}
 	
-	draw: function() {
+	draw() {
 		// Draw this lifeline plot component on the host svg element...
 		
 		for (var link in this.link2lifeline) {
@@ -413,26 +412,25 @@ LifelinePlotComponent.prototype = {
 
 
 // A plot of a set of lifeline bars:
-function LifelinePlot(svgTarget, selectedPeople, selectedLineages, link2person) {
-	// - Precondition: The input svg display must be blank when this method is invoked
+export class LifelinePlot {
+	constructor(svgTarget, selectedPeople, selectedLineages, link2person) {
+		// - Precondition: The input svg display must be blank when this method is invoked
 
-	this.startYear = null; // Year corresponding to the start of the plot
-	this.endYear = null; // Year corresponding to the end of the plot
-	this.peopleToPlot = selectedPeople;
-	this.lineagesToShow = selectedLineages;
-	this.link2person = link2person;
-	this.plotComponents = [];
-	this.svgTarget = svgTarget;
+		this.startYear = null; // Year corresponding to the start of the plot
+		this.endYear = null; // Year corresponding to the end of the plot
+		this.peopleToPlot = selectedPeople;
+		this.lineagesToShow = selectedLineages;
+		this.link2person = link2person;
+		this.plotComponents = [];
+		this.svgTarget = svgTarget;
 	
-	 // Margin will occupy this much of the svg element:
-	this.marginFraction = 0.1;
+		 // Margin will occupy this much of the svg element:
+		this.marginFraction = 0.1;
 	
-	this.boxWidth = 2; // XXX FIXME. Not sure how/where to specify this and in what units.
-}
+		this.boxWidth = 2; // XXX FIXME. Not sure how/where to specify this and in what units.
+	}
 
-
-LifelinePlot.prototype = {
-	calculateBoundaryYears: function() {
+	calculateBoundaryYears() {
 		// Calibrate the canvas start and end year based on the earliest birth
 		// and last death dates:
 		this.startYear = getFirstBirth(this.peopleToPlot, this.link2person);
@@ -441,9 +439,9 @@ LifelinePlot.prototype = {
 		//console.log("TRACE: Years for plot:");
 		//console.log(this.startYear);
 		//console.log(this.endYear);
-	},
+	}
 	
-	getYearCoord: function(year) {
+	getYearCoord(year) {
 		// FIXME: This has got to be wrong:
 		var svgHeight = this.svgTarget[0][0].clientHeight;
 			
@@ -451,24 +449,24 @@ LifelinePlot.prototype = {
 		var fractionOfHeight = (year - this.startYear)/(this.endYear - this.startYear);
 		var yPos = fractionOfHeight*svgHeight; // XXX I think this will work; but PROBLEM: Doesn't consider margins that I might wish to include around the plot itself.
 		return yPos;
-	},
+	}
 
-	getSvgWidth: function() {
+	getSvgWidth() {
 		// FIXME: This has got to be wrong:
 		return this.svgTarget[0][0].clientWidth;
-	},
+	}
 	
 	// Hacky method to convert x postion as a fraction of width to
 	// an actual x coordinate on the svg element, taking the margin width
 	// into consideration:
-	fraction2position: function(fractionOfWidth) {
+	fraction2position(fractionOfWidth) {
 		var marginWidth = this.marginFraction * this.getSvgWidth();
 		var plotWidth = (1 - (this.marginFraction * 2)) * this.getSvgWidth();
 		var extraDist = fractionOfWidth * plotWidth;
 		return marginWidth + extraDist;
-	},
+	}
 	
-	convertXpos: function(gridPos) {
+	convertXpos(gridPos) {
 		var svgWidth = this.getSvgWidth();
 		
 		// Translate a grid position to an x postion on the plot canvas:
@@ -482,25 +480,25 @@ LifelinePlot.prototype = {
 		// visualisations are working:
 		
 		return this.fraction2position(fractionOfWidth);//fractionOfWidth * svgWidth;
-	},
+	}
 
-	getMinGridPos: function() {
+	getMinGridPos() {
 		return this.plotComponents[0].getMinGridPos();
-	},
+	}
 
-	getMaxGridPos: function() {
+	getMaxGridPos() {
 		var lastComponent = this.plotComponents[this.plotComponents.length - 1];
 		return lastComponent.getMaxGridPos();
-	},
+	}
 
-	getGridWidth: function() {
+	getGridWidth() {
 		return this.getMaxGridPos() - this.getMinGridPos();
-	},
+	}
 
-	convertYpos: function(yPos) {
+	convertYpos(yPos) {
 		// XXX FIXME: Adjust to include margin:
 		return this.getYearCoord(yPos);
-	},
+	}
 
 	displayLifelines: function() {
 		// Overview:
@@ -598,40 +596,38 @@ LifelinePlot.prototype = {
 
 // Lifeline class - a rectangular representation of a person's lifespan,
 // within a lifeline plot:
-function Lifeline(person, hostComponent) {
-	this.person = person;
-	this.hostComponent = hostComponent;
+export class Lifeline {
+	constructor(person, hostComponent) {
+		this.person = person;
+		this.hostComponent = hostComponent;
 	
-	// Parent/Child birth lines for this individual (as a child):
-	this.motherBirthline = null;
-	this.fatherBirthline = null;
+		// Parent/Child birth lines for this individual (as a child):
+		this.motherBirthline = null;
+		this.fatherBirthline = null;
 	
-	this.gridPosition = null; // A grid position on the plot.
+		this.gridPosition = null; // A grid position on the plot.
 
-	this.svgRectangle = null;
+		this.svgRectangle = null;
 	
-	// Bars indicating periods as a reigning monarch:
-	this.reignBars = [];
+		// Bars indicating periods as a reigning monarch:
+		this.reignBars = [];
 	
-	// XXX Should the lifeline have a set of links to child lifelines? Should it have a mother and father link?
-}
+		// XXX Should the lifeline have a set of links to child lifelines? Should it have a mother and father link?
+	}
 
-
-// Methods of lifeline class:
-Lifeline.prototype = {
-	getXstart: function() {
+	getXstart() {
 		return this.hostComponent.hostPlot.convertXpos(this.gridPosition);
-	},
+	}
 	
-	getYstart: function() {
+	getYstart() {
 		return this.hostComponent.hostPlot.convertYpos(this.person.birth);
-	},
+	}
 
-	getYend: function() {
+	getYend() {
 		return this.hostComponent.hostPlot.convertYpos(this.person.getDeath());
-	},
+	}
 	
-	draw: function() {
+	draw() {
 		var xStart = this.getXstart();
 		var yStart = this.getYstart();
 		var yEnd = this.getYend();
@@ -660,9 +656,9 @@ Lifeline.prototype = {
 		
 		// Draw reigns for this lifeline:
 		this.drawReigns();
-	},
+	}
 
-	drawReigns: function() {
+	drawReigns() {
 		// FIXME: Perhaps need to think about how to do this a bit more.
 		var lineagesToShowLinks = new Set(this.hostComponent.hostPlot.lineagesToShow.map(function(x) {return x.link}));
 
@@ -687,9 +683,9 @@ Lifeline.prototype = {
 				this.reignBars.push(reignRectangle);
 			}
 		}
-	},
+	}
 	
-	select: function(depth) {
+	select(depth) {
 		var person = this.person;
 		var currLink = "https://en.wikipedia.org".concat(person.link);
 
@@ -722,6 +718,9 @@ Lifeline.prototype = {
 }
 
 
+// XXXYYY INTRODUCE A REIGN-BAR CLASS, AND MOVE CODE FOR DRAWING REIGNS IN IT'S RENDER FUNCTION.
+
+
 // FIXME: Code for indicating selection of a rectangle with a specified
 // intensity level. Should replace this with a CSS class name approach,
 // once I can get that working for SVG elements:
@@ -744,16 +743,14 @@ function displaySelected(svgRectangle, intensityLevel) {
 
 // Birthline class: A line representing the relationship between this parent
 // and this child at the year of birth:
-function Birthline(childLifeline, parentLifeline) {
-	this.childLifeline = childLifeline;
-	this.parentLifeline = parentLifeline;
-	this.svgLine = null;
-}
+export class Birthline {
+	constructor(childLifeline, parentLifeline) {
+		this.childLifeline = childLifeline;
+		this.parentLifeline = parentLifeline;
+		this.svgLine = null;
+	}
 
-
-// Methods of Birthline class...
-Birthline.prototype = {
-	draw: function() {
+	draw() {
 		var birthDate = this.childLifeline.person.birth;
 		// FIXME: Particularly nasty code:
 		var yPos = this.childLifeline.hostComponent.hostPlot.convertYpos(birthDate);
@@ -782,13 +779,12 @@ Birthline.prototype = {
 
 
 // Connected component class:
-function ConnectedComponent() {
-	this.nodes = [];
-}
+class ConnectedComponent {
+	constructor() {
+		this.nodes = [];
+	}
 
-
-ConnectedComponent.prototype = {
-	addNode: function(node) {
+	addNode(node) {
 		this.nodes.push(node);
 	}
 }
@@ -939,8 +935,6 @@ function getConnectedComponents(selectedPeople, link2person) {
 	// Return components (as an array of TimelineConnComp objects):
 	return componentGraphs;
 }
-
-
 
 
 

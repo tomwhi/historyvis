@@ -1,34 +1,33 @@
 // Person class:
-function Person(link, name, birth, death) {
-	this.link = link;
-	this.name = name;
-	this.birth = birth;
-	this.death = death;
-	this.mother = null;
-	this.father = null;
-	this.children = [];
-	this.reigns = [];
-}
+export class Person {
+	constructor(link, name, birth, death) {
+		this.link = link;
+		this.name = name;
+		this.birth = birth;
+		this.death = death;
+		this.mother = null;
+		this.father = null;
+		this.children = [];
+		this.reigns = [];
+	}
 
-
-Person.prototype = {
-	setMother: function(mother) {
+	setMother(mother) {
 		this.mother = mother;
-	},
+	}
 	
-	setFather: function(father) {
+	setFather(father) {
 		this.father = father;
-	},
+	}
 
-	addChild: function(child) {
+	addChild(child) {
 		this.children.push(child);
-	},
+	}
 	
-	addReign: function(reign) {
+	addReign(reign) {
 		this.reigns.push(reign);
-	},
+	}
 	
-	getRelatives: function() {
+	getRelatives() {
 		var relatives = [];
 		if(!(typeof this.mother === 'undefined')){
 	    	relatives.push(this.mother);
@@ -37,9 +36,9 @@ Person.prototype = {
 	    	relatives.push(this.father);
 		};
 		return relatives.concat(this.children);
-	},
+	}
 
-	getParents: function() {
+	getParents() {
 		var parents = [];
 		if(!(typeof this.mother === 'undefined')){
 	    	parents.push(this.mother);
@@ -48,13 +47,13 @@ Person.prototype = {
 	    	parents.push(this.father);
 		};
 		return parents;
-	},
+	}
 
-	getChildren: function() {
+	getChildren() {
 		return this.children;
-	},
+	}
 
-	getDeath: function() {
+	getDeath() {
 		if (this.death === null) {
 			var today = new Date();
 			return today.getFullYear();
@@ -112,28 +111,29 @@ function getEndDeath(selectedPeople, link2person) {
 
 
 // Reign class:
-function Reign(lineage, start, end, person) {
-	this.lineage = lineage;
-	this.start = start;
-	this.end = end;
-	this.person = person;
+export class Reign {
+	constructor(lineage, start, end, person) {
+		this.lineage = lineage;
+		this.start = start;
+		this.end = end;
+		this.person = person;
+	}
 }
 
 
 // Lineage class:
-function Lineage(link) {
+export class Lineage {
+	constructor(link) {
 	this.link = link;
 	this.name = link; // FIXME: Edit this once lineage name information is available.
 	this.reigns = [];
-}
+	}
 
-
-Lineage.prototype = {
-	addReign: function(reign) {
+	addReign(reign) {
 		this.reigns.push(reign);
-	},
+	}
 	
-	getPeople: function() {
+	getPeople() {
 		var people = new Set();
 		var reigns = this.reigns;
 		var nReigns = reigns.length;
@@ -145,5 +145,3 @@ Lineage.prototype = {
 		return Array.from(people);
 	}
 }
-
-
