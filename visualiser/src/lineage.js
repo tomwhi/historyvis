@@ -72,13 +72,13 @@ export class Person {
 // internal. Won't implement this yet though.
 
 
-function getFirstBirth(selectedPeople, link2person) {
-	peopleArr = Array.from(selectedPeople);
-	earliestBirthDate = Infinity;
+export function getFirstBirth(selectedPeople, link2person) {
+	var peopleArr = Array.from(selectedPeople);
+	var earliestBirthDate = Infinity;
 	var nPeople = peopleArr.length;
 
 	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
-		currPersonObj = link2person[peopleArr[personIdx]];
+		var currPersonObj = link2person[peopleArr[personIdx]];
 		if (currPersonObj.birth < earliestBirthDate) {
 			earliestBirthDate = currPersonObj.birth;
 		}
@@ -88,12 +88,12 @@ function getFirstBirth(selectedPeople, link2person) {
 }
 
 
-function getEndDeath(selectedPeople, link2person) {
-	peopleArr = Array.from(selectedPeople);
-	lastDeathDate = -Infinity;
+export function getEndDeath(selectedPeople, link2person) {
+	var peopleArr = Array.from(selectedPeople);
+	var lastDeathDate = -Infinity;
 	var nPeople = peopleArr.length;
 	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
-		currPersonObj = link2person[peopleArr[personIdx]];
+		var currPersonObj = link2person[peopleArr[personIdx]];
 		if (currPersonObj.death > lastDeathDate) {
 			lastDeathDate = currPersonObj.death;
 		}

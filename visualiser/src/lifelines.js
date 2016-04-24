@@ -1,3 +1,5 @@
+import * as lineageModule from 'lineage';
+
 function compareBirth(lifeline1, lifeline2) {
 	// Compare the two lifeline objects by birth date:
 	return lifeline1.person.birth - lifeline2.person.birth;
@@ -264,7 +266,7 @@ export class LifelinePlotComponent {
 		var currGridPos = lowestGridPos;
 		while (currGridPos <= highestGridPos) {
 			// Get all Lifeline objects with this grid position:
-			currLifelines = this.getLifelinesAtPos(currGridPos);
+			var currLifelines = this.getLifelinesAtPos(currGridPos);
 			
 			// Iterate through them, detecting clusters of overlapping
 			// lifelines, and "jittering" the lifelines in each cluster
@@ -275,10 +277,10 @@ export class LifelinePlotComponent {
 			// individual and ending with the last born individual.
 
 			// First, sort by birth date:
-			lifelinesByBirth = currLifelines.sort(compareBirth);
+			var lifelinesByBirth = currLifelines.sort(compareBirth);
 
 			// Detect clusters:
-			lifelineClusters = detectClusters(lifelinesByBirth);
+			var lifelineClusters = detectClusters(lifelinesByBirth);
 			
 			// Process each cluster:
 			for (var clusterIdx = 0; clusterIdx < lifelineClusters.length; clusterIdx++) {
@@ -290,7 +292,7 @@ export class LifelinePlotComponent {
 		}
 	}
 
-	getMinGridPos()) {
+	getMinGridPos() {
 		var minPos = Infinity;
 		for (var link in this.link2lifeline) {
 			var currLifeline = this.link2lifeline[link];
@@ -433,8 +435,8 @@ export class LifelinePlot {
 	calculateBoundaryYears() {
 		// Calibrate the canvas start and end year based on the earliest birth
 		// and last death dates:
-		this.startYear = getFirstBirth(this.peopleToPlot, this.link2person);
-		this.endYear = getEndDeath(this.peopleToPlot, this.link2person);
+		this.startYear = lineageModule.getFirstBirth(this.peopleToPlot, this.link2person);
+		this.endYear = lineageModule.getEndDeath(this.peopleToPlot, this.link2person);
 		
 		//console.log("TRACE: Years for plot:");
 		//console.log(this.startYear);
@@ -500,7 +502,7 @@ export class LifelinePlot {
 		return this.getYearCoord(yPos);
 	}
 
-	displayLifelines: function() {
+	displayLifelines() {
 		// Overview:
 		/*
 		-- Displays a given ancestry graph consisting of
@@ -673,7 +675,7 @@ export class Lifeline {
 				var yEnd = this.hostComponent.hostPlot.convertYpos(currReign.end);
 				var xStart = this.getXstart();
 				var boxWidth = this.hostComponent.hostPlot.boxWidth;
-				reignRectangle = this.hostComponent.hostPlot.svgTarget.append("rect")
+				var reignRectangle = this.hostComponent.hostPlot.svgTarget.append("rect")
 								   					   .attr("x", xStart)
 													   .attr("y", yStart)
 													   .attr("width", boxWidth)
@@ -791,7 +793,7 @@ class ConnectedComponent {
 
 
 // This is getting a bit hacky:
-function getPersonName2Link(link2person) {
+export function getPersonName2Link(link2person) {
 	// Extract person. NOTE: I'm assuming the names are unique (as are the
 	// links):
 	var name2link = {};
@@ -805,7 +807,7 @@ function getPersonName2Link(link2person) {
 
 
 // This is getting a bit hacky:
-function getLineageName2Link(link2lineage) {
+export function getLineageName2Link(link2lineage) {
 	// PROBLEM/FIXME: Lineage links are used here; I want to have the names
 	// instead:
 	var name2link = {};
@@ -819,7 +821,7 @@ function getLineageName2Link(link2lineage) {
 
 
 // Enters the person and lineage search data into the interface elements:
-function populateInterface(personNames, lineageNames) {
+export function populateInterface(personNames, lineageNames) {
 	// Javascript UI code; don't yet understand this 100% but it's needed to
 	// get my autocomplete boxes working:
 	$(function() {
@@ -913,7 +915,7 @@ function getConnectedComponents(selectedPeople, link2person) {
 	
 	var nPeople = selectedPeopleArr.length;
 	for (var personIdx = 0; personIdx < nPeople; personIdx++) {
-		currPerson = selectedPeopleArr[personIdx];
+		var currPerson = selectedPeopleArr[personIdx];
 		
 		if (!(peopleAdded.has(currPerson))) {
 			// The person has not been added to a connected component yet

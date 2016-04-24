@@ -1,7 +1,7 @@
-import Person from 'lineage';
-import Reign from 'lineage';
-import Lineage from 'lineage';
-import LifelinePlot from 'lifelines';
+import * as lineageModule from 'lineage';
+//import Reign from 'lineage';
+//import Lineage from 'lineage';
+import * as lifelinesModule from 'lifelines';
 
 function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 	var topOfStack = branchingStack.pop();
@@ -112,7 +112,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	// Retrieve the current depth setting from the interface:
 	// XXX
 
-	depth = 1;
+	var depth = 1;
 
 	var expandedIndividuals = expandIndividuals(Array.from(seedIndividuals), depth, link2person);
 	//console.log("UPDATED:");
@@ -122,7 +122,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	// lifeline plot using it:
 	clearSVG(targetSVG);
 
-	newPlot = new LifelinePlot(targetSVG, expandedIndividuals, specifiedLineages, link2person);
+	var newPlot = new lifelinesModule.LifelinePlot(targetSVG, expandedIndividuals, specifiedLineages, link2person);
 	newPlot.displayLifelines();
 }
 
@@ -143,7 +143,7 @@ function hydratePersonData(jsonObj) {
 	for (var linkIdx = 0; linkIdx < nLinks; linkIdx++) {
 		currLink = links[linkIdx];
 		currVals = jsonObj[currLink];
-		var currPerson = new Person(currLink, currVals['name'], currVals['birth'], currVals['death'])
+		var currPerson = new lineageModule.Person(currLink, currVals['name'], currVals['birth'], currVals['death'])
 		link2person[currLink] = currPerson;
 	}
 
@@ -170,19 +170,20 @@ function hydratePersonData(jsonObj) {
 
 		var reignInfo = currVals['reigns'];
 		var reignLinks = Object.keys(reignInfo);
-		nReigns = reignLinks.length;
+
+		var nReigns = reignLinks.length;
 		for (var reignIdx = 0; reignIdx < nReigns; reignIdx++) {
 			var currReignLink = reignLinks[reignIdx];
 
 			var currLineage = null;
 			if (!(currReignLink in link2lineage)) {
-				link2lineage[currReignLink] = new Lineage(currReignLink);
+				link2lineage[currReignLink] = new lineageModule.Lineage(currReignLink);
 			}
 
 			currLineage = link2lineage[currReignLink];
 			
 			// Generate a new Reign object linking to the above lineage:
-			var currReign = new Reign(currLineage, reignInfo[currReignLink][0], reignInfo[currReignLink][1], currPerson);
+			var currReign = new lineageModule.Reign(currLineage, reignInfo[currReignLink][0], reignInfo[currReignLink][1], currPerson);
 			currLineage.addReign(currReign);
 			
 			currPerson.addReign(currReign);
@@ -210,10 +211,10 @@ d3.json("Test.json", function(error, jsonObj) {
 	//console.log(link2person);
 	//console.log(link2lineage);
 
-	var personName2link = getPersonName2Link(link2person);
-	var lineageName2link = getLineageName2Link(link2lineage);
+	var personName2link = lifelinesModule.getPersonName2Link(link2person);
+	var lineageName2link = lifelinesModule.getLineageName2Link(link2lineage);
 
-	populateInterface(Object.keys(personName2link), Object.keys(lineageName2link));
+	lifelinesModule.populateInterface(Object.keys(personName2link), Object.keys(lineageName2link));
 
 	//console.log(personName2link);
 	//console.log(lineageName2link)
