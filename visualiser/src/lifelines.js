@@ -524,8 +524,6 @@ export class LifelinePlot {
 		--- Colours regions within rectangles to represent the specified titles
 		*/
 
-		var layoutAlgorithm = null; // XXX EDIT THIS
-
 		// Calculate the start and end year for the plot:
 		this.calculateBoundaryYears();
 
@@ -598,8 +596,9 @@ export class LifelinePlot {
 
 // Lifeline class - a rectangular representation of a person's lifespan,
 // within a lifeline plot:
-export class Lifeline {
+export class Lifeline extends React.Component {
 	constructor(person, hostComponent) {
+		super();
 		this.person = person;
 		this.hostComponent = hostComponent;
 	
@@ -629,6 +628,10 @@ export class Lifeline {
 		return this.hostComponent.hostPlot.convertYpos(this.person.getDeath());
 	}
 	
+	render() {
+		return <div>Hello {this.props.name}</div>;
+	}
+
 	draw() {
 		var xStart = this.getXstart();
 		var yStart = this.getYstart();

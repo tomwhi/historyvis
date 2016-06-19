@@ -1,7 +1,9 @@
-import * as lineageModule from 'lineage';
+// import * as lineageModule from 'lineage';
 //import Reign from 'lineage';
 //import Lineage from 'lineage';
 import * as lifelinesModule from 'lifelines';
+import ReactDOM from 'react-dom'
+import LifelinePlotContainer from 'containers'
 
 function processTopOfStack(branchingStack, depths, outputSet, link2person) {
 	var topOfStack = branchingStack.pop();
@@ -96,7 +98,7 @@ function updateLifelinePlot(targetSVG, personName2link, lineageName2link, link2p
 	//var specifiedLineages = params[1];
 	
 	// TEST: REMOVE THESE TWO LINES ONCE PARAMETER EXTRACTION ABOVE IS WORKING:
-	var specifiedLineages = [link2lineage["/wiki/List_of_Swedish_monarchs"]];// Swedish, /wiki/Holy_Roman_Emperor ;//];// link2lineage["/wiki/List_of_Swedish_monarchs"]
+	var specifiedLineages = [link2lineage["/wiki/Holy_Roman_Emperor"]];// /wiki/List_of_Swedish_monarchs Swedish, /wiki/Holy_Roman_Emperor ;//];// link2lineage["/wiki/List_of_Swedish_monarchs"]
 	var specifiedPeople = [link2person["/wiki/Gustavus_Adolphus_of_Sweden"], link2person["/wiki/Louis_XIV_of_France"]];// [link2person["/wiki/Frederick_I_of_Sweden"], link2person["/wiki/Frederick_V,_Elector_Palatine"]];//  /wiki/John_III_of_Sweden /wiki/Henry_VIII_of_England
 
 	var peopleInLineages = [];
@@ -195,6 +197,7 @@ function hydratePersonData(jsonObj) {
 
 
 // Load the JSON data specifying the nobility data:
+/*
 d3.json("Test.json", function(error, jsonObj) {
 	if (error) throw error;
 	//console.log(jsonObj)
@@ -225,3 +228,20 @@ d3.json("Test.json", function(error, jsonObj) {
 	updateLifelinePlot(svgTarget, personName2link, lineageName2link, link2person, link2lineage);
 	//interface.onClick = updateLifelinePlot(personName2link, lineageName2link, link2person, link2lineage);
 });
+*/
+
+const MOUNT_NODE = document.getElementById('lifelinePlotContainer')
+
+console.log(MOUNT_NODE);
+
+let render = () => {
+  console.log("TRACEWRITE: Entered the render() method.")
+  ReactDOM.render(
+    <LifelinePlotContainer/>,
+    MOUNT_NODE
+  )
+  console.log("TRACEWRITE: Exiting the render() method.")
+}
+
+
+render();
